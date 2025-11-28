@@ -1,0 +1,52 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Idea extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'title',
+        'description',
+        'industry',
+        'target_audience',
+        'strengths',
+        'weaknesses',
+        'status',
+    ];
+
+    // العلاقة مع المستخدم
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    // العلاقة مع المنافسين
+    public function competitors()
+    {
+        return $this->hasMany(Competitor::class);
+    }
+
+    // العلاقة مع التوصيات
+    public function recommendations()
+    {
+        return $this->hasMany(Recommendation::class);
+    }
+
+    // العلاقة مع التحليل المالي
+    public function financialEstimation()
+    {
+        return $this->hasOne(FinancialEstimation::class);
+    }
+
+    // العلاقة مع تقرير التحليل
+    public function report()
+    {
+        return $this->hasOne(AnalysisReport::class, 'idea_id');
+    }
+}

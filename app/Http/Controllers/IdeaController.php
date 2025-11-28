@@ -1,0 +1,336 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Idea;
+use App\Models\Competitor;
+use App\Models\Recommendation;
+use App\Models\AnalysisReport;
+use App\Models\FinancialEstimation;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Auth;
+
+
+class IdeaController extends Controller
+{
+    /**
+     * إنشاء فكرة جديدة + إرسالها للـ AI
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'title'             => 'required|string|max:255',
+            'description'       => 'required|string',
+            'industry'          => 'nullable|string',
+            'target_audience'   => 'nullable|string',
+        ]);
+
+        // 1) حفظ الفكرة
+        $idea = Idea::create([
+            'user_id'         => Auth::id(),
+            'title'           => $request->title,
+            'description'     => $request->description,
+            'industry'        => $request->industry,
+            'target_audience' => $request->target_audience,
+            'status'          => 'processing',
+        ]);
+
+        // 2) إرسال الفكرة للـ AI (Mock الآن)
+        try {
+            $aiResponse = Http::post('http://127.0.0.1:8001/api/mock-ai', [
+                'title'       => $idea->title,
+                'description' => $idea->description,
+            ]);
+
+            if (!$aiResponse->successful()) {
+                $idea->update(['status' => 'failed']);
+                return response()->json([
+                    'status' => false,
+                    'message' => 'AI server did not respond',
+                ], 500);
+            }
+
+            $ai = $aiResponse->json()['data'];
+
+        } catch (\Exception $e) {
+            $idea->update(['status' => 'failed']);
+            return response()->json([
+                'status' => false,
+                'message' => "Cannot reach AI API: " . $e->getMessage(),
+            ], 500);
+        }
+
+        // 3) حفظ التوصيات
+        foreach ($ai['recommendations'] as $rec) {
+            Recommendation::create([
+                'idea_id' => $idea->id,
+                'recommendation_text'    => $rec,
+            ]);
+        }
+
+        // 4) حفظ المنافسين
+        foreach ($ai['competitors'] as $comp) {
+            Competitor::create([
+                'idea_id'     => $idea->id,
+                'name'        => $comp['name'],
+                'description' => $comp['description'],
+            ]);
+        }
+
+        // 5) حفظ التحليل المالي
+        FinancialEstimation::create([
+            'idea_id'           => $idea->id,
+            'estimated_cost'     => $ai['financial_estimation']['estimated_cost'],
+            'estimated_revenue'   => $ai['financial_estimation']['expected_revenue'],
+            'roi'                => $ai['financial_estimation']['roi'],
+        ]);
+
+        // 6) حفظ تقرير التحليل في جدول analyses
+        AnalysisReport::create([
+            'idea_id'      => $idea->id,
+            'strengths'    => $ai['strengths'],    // هنا تخزين نقاط القوة
+            'weaknesses'   => $ai['weaknesses'],   // هنا تخزين نقاط الضعف
+            'pdf_path'     => 'none', // في المستقبل يمكن إنشاء PDF
+            'report_type'  => 'full',
+            'storage_disk' => 'local',
+        ]);
+
+
+        // 7) تحديث حالة الفكرة
+        $idea->update([
+            'status' => 'done',
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Idea analyzed successfully',
+            'idea' => $idea,
+        ]);
+    }
+
+    /**
+     * جميع أفكار المستخدم
+     */
+    public function myIdeas()
+    {
+        $ideas = Idea::where('user_id', Auth::id())
+            ->with(['competitors', 'recommendations', 'financialEstimation', 'report'])
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'ideas' => $ideas,
+        ]);
+    }
+
+    /**
+     * عرض فكرة واحدة
+     */
+    public function show($id)
+    {
+        $idea = Idea::where('id', $id)
+            ->with(['competitors', 'recommendations', 'financialEstimation', 'report'])
+            ->first();
+
+        if (!$idea) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Idea not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => true,
+            'idea' => $idea,
+        ]);
+    }
+
+    /**
+     * تحديث حالة الفكرة (للمشرف)
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:pending,processing,done,failed'
+        ]);
+
+        $idea = Idea::find($id);
+
+        if (!$idea) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Idea not found'
+            ], 404);
+        }
+
+        $idea->update(['status' => $request->status]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Status updated successfully',
+            'idea' => $idea
+        ]);
+    }
+    public function update(Request $request)
+{
+    $request->validate([
+        'idea_id'          => 'required|integer',
+        'title'            => 'required|string|max:255',
+        'description'      => 'required|string',
+        'industry'         => 'nullable|string',
+        'target_audience'  => 'nullable|string',
+    ]);
+
+    // 1) اجلب الفكرة وتأكد أنها للمستخدم نفسه
+    $idea = Idea::where('id', $request->idea_id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+    if (!$idea) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Idea not found or unauthorized'
+        ], 404);
+    }
+
+    // 2) تحديث بيانات الفكرة
+    $idea->update([
+        'title'            => $request->title,
+        'description'      => $request->description,
+        'industry'         => $request->industry,
+        'target_audience'  => $request->target_audience,
+        'status'           => 'pending',  // نرجعها pending
+    ]);
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Idea updated successfully',
+        'idea' => $idea
+    ]);
+}
+public function reanalyze(Request $request)
+{
+    $request->validate([
+        'idea_id' => 'required|integer'
+    ]);
+
+    // 1) تأكد أن الفكرة تخص المستخدم
+    $idea = Idea::where('id', $request->idea_id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+    if (!$idea) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Idea not found or unauthorized',
+        ], 404);
+    }
+
+    // 2) غيّر الحالة إلى processing
+    $idea->update(['status' => 'processing']);
+
+    // 3) احذف البيانات القديمة
+    $idea->competitors()->delete();
+    $idea->recommendations()->delete();
+    $idea->financialEstimation()->delete();
+    $idea->report()->delete();
+
+    // 4) أرسل الطلب للذكاء الاصطناعي (نفس الاستدعاء السابق)
+    try {
+        $aiResponse = Http::post('http://127.0.0.1:8001/api/mock-ai', [
+            'title'       => $idea->title,
+            'description' => $idea->description,
+        ]);
+
+        if (!$aiResponse->successful()) {
+            $idea->update(['status' => 'failed']);
+            return response()->json([
+                'status' => false,
+                'message' => 'AI server did not respond',
+            ], 500);
+        }
+
+        $ai = $aiResponse->json()['data'];
+
+    } catch (\Exception $e) {
+        $idea->update(['status' => 'failed']);
+        return response()->json([
+            'status' => false,
+            'message' => "AI error: " . $e->getMessage(),
+        ], 500);
+    }
+
+    // 5) احفظ التوصيات الجديدة
+    foreach ($ai['recommendations'] as $rec) {
+        Recommendation::create([
+            'idea_id' => $idea->id,
+            'recommendation_text' => $rec,
+        ]);
+    }
+
+    // 6) احفظ المنافسين الجدد
+    foreach ($ai['competitors'] as $comp) {
+        Competitor::create([
+            'idea_id' => $idea->id,
+            'name' => $comp['name'],
+            'description' => $comp['description'],
+        ]);
+    }
+
+    // 7) حفظ التحليل المالي الجديد
+    FinancialEstimation::create([
+        'idea_id'           => $idea->id,
+        'estimated_cost'    => $ai['financial_estimation']['estimated_cost'],
+        'estimated_revenue' => $ai['financial_estimation']['expected_revenue'],
+        'roi'               => $ai['financial_estimation']['roi'],
+    ]);
+
+    // 8) تقرير التحليل الجديد
+    AnalysisReport::create([
+        'idea_id'    => $idea->id,
+        'strengths'  => $ai['strengths'],
+        'weaknesses' => $ai['weaknesses'],
+        'pdf_path'   => 'none',
+        'report_type'  => 'full',
+        'storage_disk' => 'local',
+    ]);
+
+    // 9) تحديث حالة الفكرة
+    $idea->update(['status' => 'done']);
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Idea re-analyzed successfully',
+        'idea' => $idea
+    ]);
+}
+public function delete(Request $request)
+{
+    $request->validate([
+        'idea_id' => 'required|integer',
+    ]);
+
+    // 1) جلب الفكرة والتأكد أنها لنفس المستخدم
+    $idea = Idea::where('id', $request->idea_id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+    if (!$idea) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Idea not found or unauthorized',
+        ], 404);
+    }
+
+    // 2) حذف الفكرة (وسيتم حذف كل البيانات المرتبطة بسبب onDelete Cascade)
+    $idea->delete();
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Idea deleted successfully',
+    ]);
+}
+
+
+}
