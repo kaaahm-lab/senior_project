@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Events\IdeaCreated;
 use App\Models\Idea;
 use App\Models\Competitor;
 use App\Models\Recommendation;
@@ -331,6 +331,35 @@ public function delete(Request $request)
         'message' => 'Idea deleted successfully',
     ]);
 }
+public function event(Request $request)
+{
+    $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'required|string',
+    ]);
 
+    $idea = Idea::create([
+        'user_id' => Auth::id(),
+        'title' => $request->title,
+        'description' => $request->description,
+        'status' => 'processing',
+    ]); // <- تأكد من الفاصلة المنقوطة
+
+    try {
+        event(new IdeaCreated($idea));
+    } catch (\Throwable $e) {
+        // للتصحيح فقط — لاحقاً يمكنك إزالة الcatch
+        return response()->json([
+            'status' => false,
+            'message' => 'Broadcast error: ' . $e->getMessage()
+        ], 500);
+    }
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Idea created and event broadcasted',
+        'idea' => $idea
+    ]);
+}
 
 }
