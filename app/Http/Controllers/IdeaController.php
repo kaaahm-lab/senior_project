@@ -101,6 +101,7 @@ class IdeaController extends Controller
         $idea->update([
             'status' => 'done',
         ]);
+        event(new \App\Events\IdeaAnalysisCompleted($idea));
 
         return response()->json([
             'status' => true,
@@ -149,29 +150,7 @@ class IdeaController extends Controller
     /**
      * تحديث حالة الفكرة (للمشرف)
      */
-    public function updateStatus(Request $request, $id)
-    {
-        $request->validate([
-            'status' => 'required|in:pending,processing,done,failed'
-        ]);
 
-        $idea = Idea::find($id);
-
-        if (!$idea) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Idea not found'
-            ], 404);
-        }
-
-        $idea->update(['status' => $request->status]);
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Status updated successfully',
-            'idea' => $idea
-        ]);
-    }
     public function update(Request $request)
 {
     $request->validate([
@@ -331,35 +310,6 @@ public function delete(Request $request)
         'message' => 'Idea deleted successfully',
     ]);
 }
-public function event(Request $request)
-{
-    $request->validate([
-        'title' => 'required|string|max:255',
-        'description' => 'required|string',
-    ]);
 
-    $idea = Idea::create([
-        'user_id' => Auth::id(),
-        'title' => $request->title,
-        'description' => $request->description,
-        'status' => 'processing',
-    ]); // <- تأكد من الفاصلة المنقوطة
-
-    try {
-        event(new IdeaCreated($idea));
-    } catch (\Throwable $e) {
-        // للتصحيح فقط — لاحقاً يمكنك إزالة الcatch
-        return response()->json([
-            'status' => false,
-            'message' => 'Broadcast error: ' . $e->getMessage()
-        ], 500);
-    }
-
-    return response()->json([
-        'status' => true,
-        'message' => 'Idea created and event broadcasted',
-        'idea' => $idea
-    ]);
-}
 
 }
