@@ -7,7 +7,9 @@ use App\Models\Competitor;
 use App\Models\Recommendation;
 use App\Models\AnalysisReport;
 use App\Models\FinancialEstimation;
+use App\Services\FirebaseNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
 
@@ -101,7 +103,7 @@ class IdeaController extends Controller
         $idea->update([
             'status' => 'done',
         ]);
-        event(new \App\Events\IdeaAnalysisCompleted($idea));
+        //event(new \App\Events\IdeaAnalysisCompleted($idea));
 
         return response()->json([
             'status' => true,
@@ -278,11 +280,7 @@ public function reanalyze(Request $request)
     // 9) تحديث حالة الفكرة
     $idea->update(['status' => 'done']);
 
-    return response()->json([
-        'status' => true,
-        'message' => 'Idea re-analyzed successfully',
-        'idea' => $idea
-    ]);
+
 }
 public function delete(Request $request)
 {

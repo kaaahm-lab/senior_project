@@ -31,7 +31,12 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('/registration',[AuthManager::class,'registrationpost']);
 Route::post('/login',[AuthManager::class,'loginpost']);
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthManager::class, 'logout']);
+Route::put('/user/update', [AuthManager::class, 'updateProfile']);
+Route::delete('/user/delete', [AuthManager::class, 'deleteAccount']);
+Route::get('/user/me', [AuthManager::class, 'getMyUser']);
+Route::post('/logout', [AuthManager::class, 'logout']);
+
+
 });
 
 
