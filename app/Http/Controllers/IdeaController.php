@@ -103,7 +103,8 @@ class IdeaController extends Controller
         $idea->update([
             'status' => 'done',
         ]);
-        //event(new \App\Events\IdeaAnalysisCompleted($idea));
+       app(\App\Http\Controllers\NotificationController::class)
+    ->sendIdeaAnalysisNotification($idea->user_id, $idea->title);
 
         return response()->json([
             'status' => true,

@@ -21,7 +21,7 @@ return new class extends Migration
     $table->enum('role', ['user', 'admin', 'analyst'])->default('user');
     $table->json('profile')->nullable();
     $table->timestamps();
-    
+     $table->string('fcm_token')->nullable()->after('remember_token');
 
         });
     }
@@ -35,6 +35,8 @@ return new class extends Migration
     {
 
 
+    Schema::table('users', function (Blueprint $table) {
+        $table->dropColumn('fcm_token');   });
         Schema::dropIfExists('users');
     }
 };

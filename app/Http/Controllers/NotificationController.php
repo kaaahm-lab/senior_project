@@ -6,24 +6,27 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Illuminate\Routing\Controller;
+use App\Services\FirebaseService;
 
 class NotificationController extends Controller
 {
-   public function saveToken(Request $request)
+
+public function sendIdeaAnalysisNotification($userId, $ideaTitle)
 {
-    $request->validate([
-        'fcm_token' => 'required|string',
-    ]);
+    $user = User::find($userId);
 
-    $user = User::findOrFail(Auth::id());
+    if (!$user || !$user->fcm_token) {
+        return response()->json(['status' => false, 'message' => 'No FCM token found']);
+    }
 
-    $user->update([
-        'fcm_token' => $request->fcm_token,
-    ]);
+    $firebase = new FirebaseService();
+    $firebase->sendNotification(
+        $user->fcm_token,
+        'Idea Analysis Completed',
+        "Your idea '$ideaTitle' has been analyzed",
+        ['idea_title' => $ideaTitle]
+    );
 
-    return response()->json([
-        'status' => true,
-        'message' => 'FCM token saved successfully',
-    ]);
+    return response()->json(['status' => true, 'message' => 'Notification sent']);
 }
 }
