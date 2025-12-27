@@ -160,6 +160,46 @@ public function updateProfile(Request $request)
     }
 }
 
+// 🔴 حذف الحساب
+public function deleteAccount(Request $request)
+{
+    try {
+        $user = $request->user();
+
+        // حذف جميع التوكنات
+        $user->tokens()->delete();
+
+        // حذف المستخدم
+        $user->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Account deleted successfully'
+        ], 200);
+
+    } catch (\Throwable $th) {
+        return response()->json([
+            'status' => false,
+            'message' => $th->getMessage()
+        ], 500);
+    }
+}
+// 🔵 جلب بيانات المستخدم الحالي
+public function getMyUser(Request $request)
+{
+    try {
+        return response()->json([
+            'status' => true,
+            'user' => $request->user()
+        ], 200);
+
+    } catch (\Throwable $th) {
+        return response()->json([
+            'status' => false,
+            'message' => $th->getMessage()
+        ], 500);
+    }
+}
 
 
 
