@@ -11,14 +11,17 @@ class AnalysisReport extends Model
 
     protected $table = 'analyses'; // مهم جداً
 
-    protected $fillable = [
+   protected $fillable = [
         'idea_id',
-        'strengths',
-        'weaknesses',
-        'report',
-        'pdf_path',
-        'report_type',
-        'storage_disk',
+        'predicted_category',
+        'confidence',
+        'is_ambiguous',
+        'top_k',
+    ];
+    protected $casts = [
+        'top_k' => 'array',
+        'is_ambiguous' => 'boolean',
+        'confidence' => 'float',
     ];
 
     public function idea()

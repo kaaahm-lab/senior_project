@@ -9,37 +9,26 @@ class MockAiController extends Controller
 {
     public function analyze(Request $request)
     {
+        // يمكنك لاحقاً استخدام $request->idea_text و $request->top_k
+        // حالياً Mock ثابت للاختبار
+
         return response()->json([
-            "success" => true,
-            "message" => "Mock AI response returned successfully",
-            "data" => [
-                "strengths" => "Your idea has strong market potential",
-                "weaknesses" => "High competition in this field",
-
-                "recommendations" => [
-                    "Improve your marketing strategy",
-                    "Target specific niche customers",
-                    "Focus on differentiation"
+            "predicted_category" => "Healthcare",
+            "confidence" => 0.978,
+            "is_ambiguous" => false,
+            "top_k" => [
+                [
+                    "category" => "Healthcare",
+                    "confidence" => 0.978
                 ],
-
-                "competitors" => [
-                    [
-                        "name" => "Competitor A",
-                        "description" => "Large established company"
-                    ],
-                    [
-                        "name" => "Competitor B",
-                        "description" => "Growing startup in the same sector"
-                    ]
+                [
+                    "category" => "Professional Services",
+                    "confidence" => 0.015
                 ],
-
-                "financial_estimation" => [
-                    "estimated_cost" => 1500,
-                    "expected_revenue" => 5000,
-                    "roi" => 233.33
-                ],
-
-                "report" => "This is a full mock AI analysis for testing."
+                [
+                    "category" => "Corporate Services",
+                    "confidence" => 0.007
+                ]
             ]
         ]);
     }

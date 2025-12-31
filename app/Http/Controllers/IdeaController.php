@@ -12,21 +12,24 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
-
+use Illuminate\Support\Facades\DB;
 
 class IdeaController extends Controller
 {
     /**
      * إنشاء فكرة جديدة + إرسالها للـ AI
      */
-    public function store(Request $request)
-    {
-        $request->validate([
-            'title'             => 'required|string|max:255',
-            'description'       => 'required|string',
-            'industry'          => 'nullable|string',
-            'target_audience'   => 'nullable|string',
-        ]);
+   public function store(Request $request)
+{
+    $request->validate([
+        'title'           => 'required|string|max:255',
+        'description'     => 'required|string',
+        'industry'        => 'nullable|string',
+        'target_audience' => 'nullable|string',
+    ]);
+
+    // استخدام Transaction لضمان سلامة البيانات
+    return DB::transaction(function () use ($request) {
 
         // 1) حفظ الفكرة
         $idea = Idea::create([
@@ -38,80 +41,48 @@ class IdeaController extends Controller
             'status'          => 'processing',
         ]);
 
-        // 2) إرسال الفكرة للـ AI (Mock الآن)
         try {
-            $aiResponse = Http::post('http://127.0.0.1:8001/api/mock-ai', [
-                'title'       => $idea->title,
-                'description' => $idea->description,
+            // 2) إرسال الفكرة للـ AI
+            $aiResponse = Http::timeout(10)->post('http://127.0.0.1:8001/api/mock-ai', [
+                'idea_text' => $idea->description,
+                'top_k' => 3
             ]);
 
             if (!$aiResponse->successful()) {
-                $idea->update(['status' => 'failed']);
-                return response()->json([
-                    'status' => false,
-                    'message' => 'AI server did not respond',
-                ], 500);
+                throw new \Exception("AI API error");
             }
 
-            $ai = $aiResponse->json()['data'];
+            $ai = $aiResponse->json();
+
+            // 3) حفظ التقرير
+            $report = AnalysisReport::create([
+                'idea_id'            => $idea->id,
+                'predicted_category' => $ai['predicted_category'],
+                'confidence'         => $ai['confidence'],
+                'is_ambiguous'       => $ai['is_ambiguous'],
+                'top_k'              => $ai['top_k'],
+            ]);
+
+            $idea->update(['status' => 'done']);
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Idea analyzed successfully',
+                'data'    => [
+                    'idea' => $idea,
+                    'report' => $report
+                ]
+            ]);
 
         } catch (\Exception $e) {
             $idea->update(['status' => 'failed']);
             return response()->json([
                 'status' => false,
-                'message' => "Cannot reach AI API: " . $e->getMessage(),
+                'message' => "Analysis failed: " . $e->getMessage(),
             ], 500);
         }
-
-        // 3) حفظ التوصيات
-        foreach ($ai['recommendations'] as $rec) {
-            Recommendation::create([
-                'idea_id' => $idea->id,
-                'recommendation_text'    => $rec,
-            ]);
-        }
-
-        // 4) حفظ المنافسين
-        foreach ($ai['competitors'] as $comp) {
-            Competitor::create([
-                'idea_id'     => $idea->id,
-                'name'        => $comp['name'],
-                'description' => $comp['description'],
-            ]);
-        }
-
-        // 5) حفظ التحليل المالي
-        FinancialEstimation::create([
-            'idea_id'           => $idea->id,
-            'estimated_cost'     => $ai['financial_estimation']['estimated_cost'],
-            'estimated_revenue'   => $ai['financial_estimation']['expected_revenue'],
-            'roi'                => $ai['financial_estimation']['roi'],
-        ]);
-
-        // 6) حفظ تقرير التحليل في جدول analyses
-        AnalysisReport::create([
-            'idea_id'      => $idea->id,
-            'strengths'    => $ai['strengths'],    // هنا تخزين نقاط القوة
-            'weaknesses'   => $ai['weaknesses'],   // هنا تخزين نقاط الضعف
-            'pdf_path'     => 'none', // في المستقبل يمكن إنشاء PDF
-            'report_type'  => 'full',
-            'storage_disk' => 'local',
-        ]);
-
-
-        // 7) تحديث حالة الفكرة
-        $idea->update([
-            'status' => 'done',
-        ]);
-       app(\App\Http\Controllers\NotificationController::class)
-    ->sendIdeaAnalysisNotification($idea->user_id, $idea->title);
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Idea analyzed successfully',
-            'idea' => $idea,
-        ]);
-    }
+    });
+}
 
     /**
      * جميع أفكار المستخدم

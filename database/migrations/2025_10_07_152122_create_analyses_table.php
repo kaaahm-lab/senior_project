@@ -12,15 +12,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('idea_id')->constrained('ideas')->onDelete('cascade');
 
-            // نصوص تحليل الذكاء الاصطناعي
-            $table->text('strengths')->nullable();
-            $table->text('weaknesses')->nullable();
-            $table->text('report')->nullable();
-
-            // تقرير PDF (اختياري)
-            $table->string('pdf_path')->nullable();
-            $table->string('report_type')->default('full');
-            $table->string('storage_disk')->default('local');
+            $table->string('predicted_category')->nullable();
+        $table->float('confidence')->nullable();
+        $table->boolean('is_ambiguous')->default(false);
+        $table->json('top_k')->nullable();
 
             $table->timestamps();
         });
