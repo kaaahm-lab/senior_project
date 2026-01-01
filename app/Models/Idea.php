@@ -13,10 +13,6 @@ class Idea extends Model
         'user_id',
         'title',
         'description',
-        'industry',
-        'target_audience',
-        'strengths',
-        'weaknesses',
         'status',
     ];
 

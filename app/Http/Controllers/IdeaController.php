@@ -24,8 +24,7 @@ class IdeaController extends Controller
     $request->validate([
         'title'           => 'required|string|max:255',
         'description'     => 'required|string',
-        'industry'        => 'nullable|string',
-        'target_audience' => 'nullable|string',
+        
     ]);
 
     // استخدام Transaction لضمان سلامة البيانات
@@ -36,8 +35,6 @@ class IdeaController extends Controller
             'user_id'         => Auth::id(),
             'title'           => $request->title,
             'description'     => $request->description,
-            'industry'        => $request->industry,
-            'target_audience' => $request->target_audience,
             'status'          => 'processing',
         ]);
 
