@@ -26,6 +26,6 @@ class AnalysisReport extends Model
 
     public function idea()
     {
-        return $this->belongsTo(Idea::class);
+        return $this->belongsTo(Idea::class, 'idea_id');
     }
 }

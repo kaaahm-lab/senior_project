@@ -9,12 +9,16 @@ class Competitor extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
+      protected $fillable = [
         'idea_id',
         'name',
-        'description',
+        'industry',
+        'region',
+        'country',
+        'company_size',
+        'website',
         'similarity_score',
-        'url',
+        
     ];
 
     public function idea()

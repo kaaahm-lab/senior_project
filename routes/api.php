@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\IdeaController;
 use App\Http\Controllers\MockAiController;
+use App\Http\Controllers\MockCompetitionAiController;
 use App\Http\Controllers\RecommendationController;
 
 /*
@@ -54,6 +55,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/ideas/{id}/status', [IdeaController::class, 'updateStatus']);
 });
 Route::post('/mock-ai', [MockAiController::class, 'analyze']);
+Route::post('/mock-ai/competition', [MockCompetitionAiController::class, 'analyze']);
+Route::middleware('auth:sanctum')->post(
+    '/ideas/competition-analysis',
+    [IdeaController::class, 'runCompetitionAnalysis']
+);
 
 Route::middleware('auth:sanctum')->group(function () {
 

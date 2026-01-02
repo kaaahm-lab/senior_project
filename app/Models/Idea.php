@@ -45,4 +45,10 @@ class Idea extends Model
     {
         return $this->hasOne(AnalysisReport::class, 'idea_id');
     }
+
+    public function swot()
+{
+    return $this->hasOne(SwotAnalysis::class);
+}
+
 }

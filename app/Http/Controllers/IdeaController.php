@@ -7,12 +7,14 @@ use App\Models\Competitor;
 use App\Models\Recommendation;
 use App\Models\AnalysisReport;
 use App\Models\FinancialEstimation;
+use App\Models\SwotAnalysis;
 use App\Services\FirebaseNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+
 
 class IdeaController extends Controller
 {
@@ -24,7 +26,7 @@ class IdeaController extends Controller
     $request->validate([
         'title'           => 'required|string|max:255',
         'description'     => 'required|string',
-        
+
     ]);
 
     // استخدام Transaction لضمان سلامة البيانات
@@ -40,7 +42,8 @@ class IdeaController extends Controller
 
         try {
             // 2) إرسال الفكرة للـ AI
-            $aiResponse = Http::timeout(10)->post('http://127.0.0.1:8001/api/mock-ai', [
+            $aiResponse = Http::timeout(10)->post('http://127.0.0.1:8001/api/mock-ai',
+             [
                 'idea_text' => $idea->description,
                 'top_k' => 3
             ]);
@@ -80,6 +83,145 @@ class IdeaController extends Controller
         }
     });
 }
+
+
+public function runCompetitionAnalysis(Request $request)
+{
+    return DB::transaction(function () use ($request) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | 1️⃣ جلب الفكرة والتأكد من الملكية
+        |--------------------------------------------------------------------------
+        */
+
+        $idea = Idea::where('id', $request->idea_id)
+                    ->where('user_id', Auth::id())
+                    ->first();
+
+        if (!$idea) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Idea not found or unauthorized'
+            ], 404);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 2️⃣ جلب نتيجة Model 1 (Idea Classification)
+        |--------------------------------------------------------------------------
+        */
+
+
+
+        $analysis = AnalysisReport::where('idea_id', $idea->id)->latest()->first();
+
+        if (!$analysis) {
+            throw new \Exception('Idea classification not found (no analysis record)');
+        }
+
+        if (empty($analysis->predicted_category)) {
+            throw new \Exception('Idea classification found but predicted_category is empty');
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3️⃣ إرسال Request إلى AI Model 2
+        |--------------------------------------------------------------------------
+        */
+
+        $response = Http::timeout(10)->post(
+            'http://127.0.0.1:8001/api/mock-ai/competition',
+            [
+                'idea_text'       => $idea->description,
+                'industry_hint'   => $analysis->predicted_category,
+                'target_country'  => $request->target_country,
+                'target_city'     => $request->target_city,
+                'max_competitors' => $request->max_competitors ?? 10,
+                'max_clusters'    => $request->max_clusters ?? 4,
+            ]
+        );
+
+        if (!$response->successful()) {
+            throw new \Exception('Competition AI API failed');
+        }
+
+        $data = $response->json();
+
+        /*
+        |--------------------------------------------------------------------------
+        | 4️⃣ تخزين المنافسين
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($data['competitors'] as $comp) {
+            Competitor::create([
+                'idea_id'          => $idea->id,
+                'name'             => $comp['name'],
+                'industry'         => $comp['industry'],
+                'region'           => $comp['region'],
+                'country'          => $comp['country'],
+                'company_size'     => $comp['size'],
+                'website'          => $comp['website'] ?? null,
+                'similarity_score' => $comp['similarity_score'],
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 5️⃣ تخزين SWOT Analysis
+        |--------------------------------------------------------------------------
+        */
+
+        SwotAnalysis::create([
+            'idea_id'       => $idea->id,
+            'strengths'     => $data['swot']['strengths'],
+            'weaknesses'    => $data['swot']['weaknesses'],
+            'opportunities' => $data['swot']['opportunities'],
+            'threats'       => $data['swot']['threats'],
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | 6️⃣ تحديث حالة الفكرة
+        |--------------------------------------------------------------------------
+        */
+
+        $idea->update(['status' => 'done']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | 7️⃣ إرسال إشعار
+        |--------------------------------------------------------------------------
+        */
+
+        event(new \App\Events\IdeaAnalysisCompleted($idea));
+
+        /*
+        |--------------------------------------------------------------------------
+        | 🔚 Response
+        |--------------------------------------------------------------------------
+        */
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Competition analysis completed successfully',
+            'data' => [
+                'idea_id'     => $idea->id,
+                'competitors' => count($data['competitors']),
+                'clusters'    => count($data['clusters']),
+                'swot'        => true,
+            ]
+        ]);
+    });
+}
+
+
+
+
+
+
 
     /**
      * جميع أفكار المستخدم
