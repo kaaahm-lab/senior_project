@@ -9,15 +9,7 @@ class MockCompetitionAiController extends Controller
 {
     public function analyze(Request $request)
     {
-        // Validation (خفيف – فقط للتجربة)
-        $request->validate([
-            'idea_text' => 'required|string',
-            'industry_hint' => 'nullable|string',
-            'target_country' => 'nullable|string',
-            'target_city' => 'nullable|string',
-            'max_competitors' => 'nullable|integer',
-            'max_clusters' => 'nullable|integer',
-        ]);
+  
 
         return response()->json([
             "idea" => [

@@ -204,16 +204,18 @@ public function runCompetitionAnalysis(Request $request)
         |--------------------------------------------------------------------------
         */
 
-        return response()->json([
-            'status'  => true,
-            'message' => 'Competition analysis completed successfully',
-            'data' => [
-                'idea_id'     => $idea->id,
-                'competitors' => count($data['competitors']),
-                'clusters'    => count($data['clusters']),
-                'swot'        => true,
-            ]
-        ]);
+                        return response()->json([
+                    'status' => true,
+
+                    
+                    'idea' => $data['idea'],
+                    'competitors_summary' => $data['competitors_summary'],
+                    'competitors' => $data['competitors'],
+                    'clusters' => $data['clusters'],
+                    'swot' => $data['swot'],
+                    'metadata' => $data['metadata'] ?? null
+                ]);
+
     });
 }
 
